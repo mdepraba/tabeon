@@ -1,0 +1,19 @@
+{
+  "name": "Tabeon: Tab Management",
+  "description": "A browser extension built with Vue and Vite.",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "action": {
+    "default_popup": "index.html"
+  },
+  "permissions": ["tabs", "storage", "tabGroups", "search", "history", "bookmarks"],
+  "host_permissions": ["https://suggestqueries.google.com/*", "https://duckduckgo.com/*"],
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "icons": {
+    "16": "favicon.svg",
+    "48": "favicon.svg",
+    "128": "favicon.svg"
+  }
+}
