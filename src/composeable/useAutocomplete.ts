@@ -18,10 +18,12 @@ export const useAutocomplete = () => {
     }
 
     isLoading.value = true
+
     try {
-      const tasks = [getHistory(query), getBookmark(query), getSearchSuggestions(query)]
-      const [historyRes, bookmarksRes, searchRes] = await Promise.all(tasks)
-      const combined = [...historyRes, ...bookmarksRes, ...searchRes]
+      const tasks = [getHistory(query), getBookmark(query), getGoogleSuggestions(query)]
+
+      const [historyRes, bookmarksRes, googleRes] = await Promise.all(tasks)
+      const combined = [...historyRes, ...bookmarksRes, ...googleRes]
       suggestion.value = combined.slice(0, 10)
     } catch (error) {
       console.error('Autocomplete error:', error)
@@ -30,57 +32,26 @@ export const useAutocomplete = () => {
     }
   }
 
-  const getGoogleSuggestions = async (q: string): Promise<Suggestion[]> => {
-    const res = await fetch(
-      `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(q)}`
-    )
-
-    if (!res.ok) {
-      throw new Error('Google Suggest failed')
-    }
-
-    const data = await res.json()
-
-    return (data[1] ?? []).slice(0, 5).map(
-      (item: string, index: number): Suggestion => ({
-        id: `google-${index}`,
-        type: 'search',
-        title: item,
-      })
-    )
-  }
-
-  const getDuckDuckGoSuggestions = async (q: string): Promise<Suggestion[]> => {
-    const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(q)}`)
-
-    if (!res.ok) {
-      throw new Error('DuckDuckGo Suggest failed')
-    }
-
-    const data = await res.json()
-
-    return data.slice(0, 5).map(
-      (item: { phrase: string }, index: number): Suggestion => ({
-        id: `ddg-${index}`,
-        type: 'search',
-        title: item.phrase,
-      })
-    )
-  }
-
-  const getSearchSuggestions = async (q: string): Promise<Suggestion[]> => {
-    try {
-      return await getGoogleSuggestions(q)
-    } catch (err) {
-      console.warn('Google Suggest failed, fallback to DuckDuckGo', err)
-
-      try {
-        return await getDuckDuckGoSuggestions(q)
-      } catch (err2) {
-        console.error('DuckDuckGo Suggest failed', err2)
-        return []
+  // ✅ Fetch via background script — bypass CORS
+  const getGoogleSuggestions = (q: string): Promise<Suggestion[]> => {
+    return new Promise(resolve => {
+      if (typeof chrome === 'undefined' || !chrome.runtime) {
+        resolve([])
+        return
       }
-    }
+
+      chrome.runtime.sendMessage(
+        { type: 'FETCH_SUGGESTIONS', query: q },
+        (response: { success: boolean; data: Suggestion[] }) => {
+          if (chrome.runtime.lastError) {
+            console.warn('Runtime error:', chrome.runtime.lastError.message)
+            resolve([])
+            return
+          }
+          resolve(response?.success ? response.data : [])
+        }
+      )
+    })
   }
 
   const getHistory = async (q: string): Promise<Suggestion[]> => {
@@ -88,7 +59,7 @@ export const useAutocomplete = () => {
       const results = await chrome.history.search({ text: q, maxResults: 4 })
       return results.map(item => ({
         id: `history-${item.id}`,
-        type: 'history',
+        type: 'history' as const,
         title: item.title || item.url || q,
         url: item.url,
       }))
@@ -101,7 +72,7 @@ export const useAutocomplete = () => {
       const results = await chrome.bookmarks.search(q)
       return results.slice(0, 3).map(item => ({
         id: `bookmark-${item.id}`,
-        type: 'bookmark',
+        type: 'bookmark' as const,
         title: item.title || item.url || q,
         url: item.url,
       }))
@@ -109,9 +80,5 @@ export const useAutocomplete = () => {
     return []
   }
 
-  return {
-    suggestion,
-    isLoading,
-    fetchSuggestion,
-  }
+  return { suggestion, isLoading, fetchSuggestion }
 }

@@ -7,7 +7,14 @@
     "default_popup": "index.html"
   },
   "permissions": ["tabs", "storage", "tabGroups", "search", "history", "bookmarks"],
-  "host_permissions": ["https://suggestqueries.google.com/*", "https://duckduckgo.com/*"],
+  "host_permissions": [
+    "https://suggestqueries.google.com/*",
+    "https://www.google.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.ts",
+    "type": "module"
+  },
   "chrome_url_overrides": {
     "newtab": "index.html"
   },

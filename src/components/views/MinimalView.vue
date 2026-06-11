@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick} from 'vue'
 import SearchInput from '../Search.vue'
 import { useAutocomplete, type Suggestion } from '../../composeable/useAutocomplete'
 
@@ -10,6 +10,17 @@ let timerInterval: ReturnType<typeof setInterval>
 let debounceTimer: ReturnType<typeof setTimeout>
 
 const { suggestion, fetchSuggestion } = useAutocomplete()
+
+const searchComponentRef = ref<InstanceType<typeof SearchInput> | null>(null)
+
+// BARU: Logika untuk mendengarkan Ctrl + K / Cmd + K
+const handleGlobalShortcut = (e: KeyboardEvent) => {
+  // Mengecek apakah tombol Ctrl atau Cmd (metaKey) ditekan bersamaan dengan 'k'
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault() // Mencegah browser membuka omnibox bawaannya
+    searchComponentRef.value?.focus() // Panggil fungsi fokus
+  }
+}
 
 watch(searchQuery, () => {
   clearTimeout(debounceTimer)
@@ -75,11 +86,18 @@ function isLikelyUrl(text: string) {
 onMounted(() => {
   updateClock()
   timerInterval = setInterval(updateClock, 1000)
+
+  window.addEventListener('keydown', handleGlobalShortcut)
+  nextTick(() => {
+    searchComponentRef.value?.focus()
+  })
 })
 
 onUnmounted(() => {
   clearInterval(timerInterval)
   clearTimeout(debounceTimer)
+
+  window.removeEventListener('keydown', handleGlobalShortcut)
 })
 </script>
 
@@ -99,7 +117,7 @@ onUnmounted(() => {
     <div class="w-full max-w-2xl px-4">
       <SearchInput
         v-model="searchQuery"
-        :suggestion="suggestion"
+        :suggestions="suggestion"
         @select="handleSuggestionSelect"
         placeholder="Search the web or type a URL..."
         class="text-base shadow-md"
